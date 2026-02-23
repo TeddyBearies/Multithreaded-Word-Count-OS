@@ -2,18 +2,16 @@
 #include <fstream>
 #include <string>
 #include <cctype>
+#include <unordered_map>
 
 using namespace std;
 
-// Function to normalize a word
-// - convert to lowercase
-// - remove non-alphanumeric characters
 string normalize(const string& input) {
     string result;
 
     for (char c : input) {
-        if (isalnum(c)) {
-            result += tolower(c);
+        if (isalnum((unsigned char)c)) {
+            result += (char)tolower((unsigned char)c);
         }
     }
 
@@ -33,14 +31,19 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    string word;
+    unordered_map<string, int> counts;
 
+    string word;
     while (file >> word) {
         string cleanWord = normalize(word);
-
         if (!cleanWord.empty()) {
-            cout << cleanWord << "\n";
+            counts[cleanWord]++; // increment count
         }
+    }
+
+    // Print results (order is not guaranteed with unordered_map)
+    for (auto& pair : counts) {
+        cout << pair.first << ": " << pair.second << "\n";
     }
 
     return 0;
