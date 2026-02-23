@@ -99,9 +99,7 @@ unordered_map<string, int> countSegment(const string& filename, long long start,
     unordered_map<string, int> counts;
 
     ifstream file(filename, ios::binary);
-    if (!file.is_open()) {
-        return counts;
-    }
+    if (!file.is_open()) return counts;
 
     file.seekg(start);
 
@@ -122,6 +120,7 @@ unordered_map<string, int> countSegment(const string& filename, long long start,
         pos++;
     }
 
+    // Flush last word
     if (!current.empty()) {
         string cleanWord = normalize(current);
         if (!cleanWord.empty()) counts[cleanWord]++;
@@ -133,6 +132,32 @@ unordered_map<string, int> countSegment(const string& filename, long long start,
 void mergeCounts(unordered_map<string, int>& target, const unordered_map<string, int>& src) {
     for (auto& p : src) {
         target[p.first] += p.second;
+    }
+}
+
+// Simple worker function 
+void workerTask(int id,
+                const string& filename,
+                Segment seg,
+                unordered_map<string, int>& globalCounts,
+                mutex& mergeMutex,
+                mutex& printMutex) {
+
+    unordered_map<string, int> localCounts = countSegment(filename, seg.start, seg.end);
+
+    // Intermediate output for this thread (protected)
+    {
+        lock_guard<mutex> lock(printMutex);
+        cout << "\n--- Thread " << id << " segment [" << seg.start << ", " << seg.end << ") ---\n";
+        for (auto& p : localCounts) {
+            cout << p.first << ": " << p.second << "\n";
+        }
+    }
+
+    // Merge into global map (protected)
+    {
+        lock_guard<mutex> lock(mergeMutex);
+        mergeCounts(globalCounts, localCounts);
     }
 }
 
@@ -170,27 +195,29 @@ int main(int argc, char* argv[]) {
              << " end=" << segments[i].end << "\n";
     }
 
-    unordered_map<string, int> combinedCounts;
+    unordered_map<string, int> globalCounts;
     mutex mergeMutex;
-    vector<thread> workers;
+    mutex printMutex;
+
+    vector<thread> threads;
 
     for (int i = 0; i < (int)segments.size(); i++) {
-        workers.push_back(thread([&, i]() {
-            unordered_map<string, int> segCounts =
-                countSegment(filename, segments[i].start, segments[i].end);
-
-            lock_guard<mutex> lock(mergeMutex);
-            mergeCounts(combinedCounts, segCounts);
-        }));
+        threads.push_back(thread(workerTask,
+                                 i,
+                                 filename,
+                                 segments[i],
+                                 ref(globalCounts),
+                                 ref(mergeMutex),
+                                 ref(printMutex)));
     }
 
-    for (auto& t : workers) {
+    for (auto& t : threads) {
         t.join();
     }
 
-    cout << "Final consolidated counts:\n";
-    for (auto& pair : combinedCounts) {
-        cout << pair.first << ": " << pair.second << "\n";
+    cout << "\n=== Final consolidated counts ===\n";
+    for (auto& p : globalCounts) {
+        cout << p.first << ": " << p.second << "\n";
     }
 
     return 0;
