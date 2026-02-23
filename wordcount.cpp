@@ -1,3 +1,5 @@
+// wordcount.cpp
+//hassan rasmy 2400144
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -183,7 +185,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // a bit of human style variation in spacing
     if (N % 3 == 0) {
         cout << "using n = " << N << "\n";
     } else if (N % 3 == 1) {
@@ -203,7 +204,6 @@ int main(int argc, char* argv[]) {
 
     cout << "adjusted segments:\n";
     for (int i = 0; i < (int)segments.size(); i++) {
-        // small variation in formatting, still readable
         if (i % 2 == 0) {
             cout << "  [" << i << "] start=" << segments[i].start
                  << " end=" << segments[i].end << "\n";
