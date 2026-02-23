@@ -47,6 +47,60 @@ vector<Segment> buildSegments(long long fileSize, int N) {
     return segments;
 }
 
+bool isDelimiter(char c) {
+    // delimiter = whitespace OR anything that is not a letter/digit
+    return isspace((unsigned char)c) || !isalnum((unsigned char)c);
+}
+
+void adjustSegments(const string& filename, vector<Segment>& segments, long long fileSize) {
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) return;
+
+    // Adjust starts (except first segment)
+    for (int i = 1; i < (int)segments.size(); i++) {
+        long long pos = segments[i].start;
+        if (pos >= fileSize) continue;
+
+        file.clear();
+        file.seekg(pos);
+
+        char c;
+        while (pos < fileSize && file.get(c)) {
+            if (isDelimiter(c)) {
+                // Move to the byte AFTER the delimiter
+                segments[i].start = pos + 1;
+                break;
+            }
+            pos++;
+        }
+    }
+
+    // Adjust ends (except last segment)
+    for (int i = 0; i < (int)segments.size() - 1; i++) {
+        long long pos = segments[i].end;
+        if (pos >= fileSize) {
+            segments[i].end = fileSize;
+            continue;
+        }
+
+        file.clear();
+        file.seekg(pos);
+
+        char c;
+        while (pos < fileSize && file.get(c)) {
+            if (isDelimiter(c)) {
+                segments[i].end = pos; // end at delimiter byte (exclusive end logic)
+                break;
+            }
+            pos++;
+        }
+    }
+
+    // Force first start and last end
+    segments[0].start = 0;
+    segments.back().end = fileSize;
+}
+
 int main(int argc, char* argv[]) {
 
     if (argc != 3) {
@@ -74,7 +128,15 @@ int main(int argc, char* argv[]) {
 
     vector<Segment> segments = buildSegments(fileSize, N);
 
-    cout << "Segments:\n";
+    cout << "Segments (raw):\n";
+    for (int i = 0; i < (int)segments.size(); i++) {
+        cout << "  [" << i << "] start=" << segments[i].start
+             << " end=" << segments[i].end << "\n";
+    }
+
+    adjustSegments(filename, segments, fileSize);
+
+    cout << "Segments (adjusted):\n";
     for (int i = 0; i < (int)segments.size(); i++) {
         cout << "  [" << i << "] start=" << segments[i].start
              << " end=" << segments[i].end << "\n";
