@@ -13,23 +13,23 @@ struct Segment {
     long long end;
 };
 
+bool isDelimiter(char c) {
+    return isspace((unsigned char)c) || !isalnum((unsigned char)c);
+}
+
 string normalize(const string& input) {
     string result;
-
     for (char c : input) {
         if (isalnum((unsigned char)c)) {
             result += (char)tolower((unsigned char)c);
         }
     }
-
     return result;
 }
 
 long long getFileSize(const string& filename) {
     ifstream file(filename, ios::binary | ios::ate);
-    if (!file.is_open()) {
-        return -1;
-    }
+    if (!file.is_open()) return -1;
     return (long long)file.tellg();
 }
 
@@ -43,20 +43,14 @@ vector<Segment> buildSegments(long long fileSize, int N) {
         segments.push_back({start, end});
         start = end;
     }
-
     return segments;
-}
-
-bool isDelimiter(char c) {
-    // delimiter = whitespace OR anything that is not a letter/digit
-    return isspace((unsigned char)c) || !isalnum((unsigned char)c);
 }
 
 void adjustSegments(const string& filename, vector<Segment>& segments, long long fileSize) {
     ifstream file(filename, ios::binary);
     if (!file.is_open()) return;
 
-    // Adjust starts (except first segment)
+    // Adjust starts (except first)
     for (int i = 1; i < (int)segments.size(); i++) {
         long long pos = segments[i].start;
         if (pos >= fileSize) continue;
@@ -67,7 +61,6 @@ void adjustSegments(const string& filename, vector<Segment>& segments, long long
         char c;
         while (pos < fileSize && file.get(c)) {
             if (isDelimiter(c)) {
-                // Move to the byte AFTER the delimiter
                 segments[i].start = pos + 1;
                 break;
             }
@@ -75,7 +68,7 @@ void adjustSegments(const string& filename, vector<Segment>& segments, long long
         }
     }
 
-    // Adjust ends (except last segment)
+    // Adjust ends (except last)
     for (int i = 0; i < (int)segments.size() - 1; i++) {
         long long pos = segments[i].end;
         if (pos >= fileSize) {
@@ -89,16 +82,57 @@ void adjustSegments(const string& filename, vector<Segment>& segments, long long
         char c;
         while (pos < fileSize && file.get(c)) {
             if (isDelimiter(c)) {
-                segments[i].end = pos; // end at delimiter byte (exclusive end logic)
+                segments[i].end = pos; // exclusive end
                 break;
             }
             pos++;
         }
     }
 
-    // Force first start and last end
     segments[0].start = 0;
     segments.back().end = fileSize;
+}
+
+unordered_map<string, int> countSegment(const string& filename, long long start, long long end) {
+    unordered_map<string, int> counts;
+
+    ifstream file(filename, ios::binary);
+    if (!file.is_open()) {
+        return counts;
+    }
+
+    file.seekg(start);
+
+    string current;
+    long long pos = start;
+
+    char c;
+    while (pos < end && file.get(c)) {
+        if (isDelimiter(c)) {
+            if (!current.empty()) {
+                string cleanWord = normalize(current);
+                if (!cleanWord.empty()) counts[cleanWord]++;
+                current.clear();
+            }
+        } else {
+            current += c;
+        }
+        pos++;
+    }
+
+    // Flush last word if segment ends in the middle of a word
+    if (!current.empty()) {
+        string cleanWord = normalize(current);
+        if (!cleanWord.empty()) counts[cleanWord]++;
+    }
+
+    return counts;
+}
+
+void mergeCounts(unordered_map<string, int>& target, const unordered_map<string, int>& src) {
+    for (auto& p : src) {
+        target[p.first] += p.second;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -127,13 +161,6 @@ int main(int argc, char* argv[]) {
     cout << "File size = " << fileSize << " bytes\n";
 
     vector<Segment> segments = buildSegments(fileSize, N);
-
-    cout << "Segments (raw):\n";
-    for (int i = 0; i < (int)segments.size(); i++) {
-        cout << "  [" << i << "] start=" << segments[i].start
-             << " end=" << segments[i].end << "\n";
-    }
-
     adjustSegments(filename, segments, fileSize);
 
     cout << "Segments (adjusted):\n";
@@ -142,26 +169,21 @@ int main(int argc, char* argv[]) {
              << " end=" << segments[i].end << "\n";
     }
 
-    // Keep existing single-thread counting for now
-    ifstream file(filename);
-    if (!file.is_open()) {
-        cout << "Error: cannot open file\n";
-        return 1;
+    // Sequentially count each segment (threads come next)
+    unordered_map<string, int> combinedCounts;
+
+    for (int i = 0; i < (int)segments.size(); i++) {
+        unordered_map<string, int> segCounts =
+            countSegment(filename, segments[i].start, segments[i].end);
+
+        mergeCounts(combinedCounts, segCounts);
     }
 
-    unordered_map<string, int> counts;
-
-    string word;
-    while (file >> word) {
-        string cleanWord = normalize(word);
-        if (!cleanWord.empty()) {
-            counts[cleanWord]++;
-        }
-    }
-
-    for (auto& pair : counts) {
+    for (auto& pair : combinedCounts) {
         cout << pair.first << ": " << pair.second << "\n";
     }
 
     return 0;
-}
+}git add wordcount.cpp
+git commit -m "Count words within each file segment sequentially"
+git push origin main
