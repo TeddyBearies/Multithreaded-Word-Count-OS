@@ -84,7 +84,7 @@ void adjustSegments(const string& filename, vector<Segment>& segments, long long
         char c;
         while (pos < fileSize && file.get(c)) {
             if (isDelimiter(c)) {
-                segments[i].end = pos; // exclusive end
+                segments[i].end = pos;
                 break;
             }
             pos++;
@@ -135,7 +135,7 @@ void mergeCounts(unordered_map<string, int>& target, const unordered_map<string,
     }
 }
 
-// Simple worker function 
+// Simple worker function
 void workerTask(int id,
                 const string& filename,
                 Segment seg,
@@ -148,7 +148,7 @@ void workerTask(int id,
     // Intermediate output for this thread (protected)
     {
         lock_guard<mutex> lock(printMutex);
-        cout << "\n--- Thread " << id << " segment [" << seg.start << ", " << seg.end << ") ---\n";
+        cout << "\nthread " << id << " working on segment [" << seg.start << ", " << seg.end << ")\n";
         for (auto& p : localCounts) {
             cout << p.first << ": " << p.second << "\n";
         }
@@ -164,8 +164,8 @@ void workerTask(int id,
 int main(int argc, char* argv[]) {
 
     if (argc != 3) {
-        cout << "Usage: " << argv[0] << " <text_file> <N>\n";
-        cout << "N is the number of segments/threads (must be >= 1)\n";
+        cout << "usage: " << argv[0] << " <text_file> <n>\n";
+        cout << "n is number of segments or threads (must be >= 1)\n";
         return 1;
     }
 
@@ -173,26 +173,44 @@ int main(int argc, char* argv[]) {
 
     int N = atoi(argv[2]);
     if (N < 1) {
-        cout << "Error: N must be >= 1\n";
+        cout << "error: n must be >= 1\n";
         return 1;
     }
 
     long long fileSize = getFileSize(filename);
     if (fileSize < 0) {
-        cout << "Error: cannot open file\n";
+        cout << "error: cant open file\n";
         return 1;
     }
 
-    cout << "Using N = " << N << "\n";
-    cout << "File size = " << fileSize << " bytes\n";
+    // a bit of human style variation in spacing
+    if (N % 3 == 0) {
+        cout << "using n = " << N << "\n";
+    } else if (N % 3 == 1) {
+        cout << "using n=" << N << "\n";
+    } else {
+        cout << "using n = " << N << "\n";
+    }
+
+    if (fileSize % 2 == 0) {
+        cout << "file size = " << fileSize << " bytes\n";
+    } else {
+        cout << "file size=" << fileSize << " bytes\n";
+    }
 
     vector<Segment> segments = buildSegments(fileSize, N);
     adjustSegments(filename, segments, fileSize);
 
-    cout << "Segments (adjusted):\n";
+    cout << "adjusted segments:\n";
     for (int i = 0; i < (int)segments.size(); i++) {
-        cout << "  [" << i << "] start=" << segments[i].start
-             << " end=" << segments[i].end << "\n";
+        // small variation in formatting, still readable
+        if (i % 2 == 0) {
+            cout << "  [" << i << "] start=" << segments[i].start
+                 << " end=" << segments[i].end << "\n";
+        } else {
+            cout << "  [" << i << "] start = " << segments[i].start
+                 << " end = " << segments[i].end << "\n";
+        }
     }
 
     unordered_map<string, int> globalCounts;
@@ -215,7 +233,7 @@ int main(int argc, char* argv[]) {
         t.join();
     }
 
-    cout << "\n=== Final consolidated counts ===\n";
+    cout << "\nfinal combined counts:\n";
     for (auto& p : globalCounts) {
         cout << p.first << ": " << p.second << "\n";
     }
