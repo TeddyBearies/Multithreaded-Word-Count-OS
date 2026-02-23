@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <cstdlib>
 #include <vector>
+#include <thread>
+#include <mutex>
 
 using namespace std;
 
@@ -120,7 +122,6 @@ unordered_map<string, int> countSegment(const string& filename, long long start,
         pos++;
     }
 
-    // Flush last word if segment ends in the middle of a word
     if (!current.empty()) {
         string cleanWord = normalize(current);
         if (!cleanWord.empty()) counts[cleanWord]++;
@@ -169,21 +170,28 @@ int main(int argc, char* argv[]) {
              << " end=" << segments[i].end << "\n";
     }
 
-    // Sequentially count each segment (threads come next)
     unordered_map<string, int> combinedCounts;
+    mutex mergeMutex;
+    vector<thread> workers;
 
     for (int i = 0; i < (int)segments.size(); i++) {
-        unordered_map<string, int> segCounts =
-            countSegment(filename, segments[i].start, segments[i].end);
+        workers.push_back(thread([&, i]() {
+            unordered_map<string, int> segCounts =
+                countSegment(filename, segments[i].start, segments[i].end);
 
-        mergeCounts(combinedCounts, segCounts);
+            lock_guard<mutex> lock(mergeMutex);
+            mergeCounts(combinedCounts, segCounts);
+        }));
     }
 
+    for (auto& t : workers) {
+        t.join();
+    }
+
+    cout << "Final consolidated counts:\n";
     for (auto& pair : combinedCounts) {
         cout << pair.first << ": " << pair.second << "\n";
     }
 
     return 0;
-}git add wordcount.cpp
-git commit -m "Count words within each file segment sequentially"
-git push origin main
+}
